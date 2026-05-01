@@ -766,30 +766,33 @@ async def join_teamcode_packet(team_code, key, iv, region):
     return await GeneRaTePk((await CrEaTe_ProTo(fields)).hex(), packet_type, key, iv)
 
 # ========== FIXED auto_start_loop ==========
+# ========== RESILIENT AUTO START LOOP (24x7) ==========
 async def auto_start_loop(team_code, uid, chat_id, chat_type, key, iv, region):
     global auto_start_running, stop_auto, online_writer, whisper_writer
-    # Force leave any existing squad before starting
+    # Initial leave attempt
     try:
-        leave_pkt = await leave_squad_packet(key, iv, region)
-        await SEndPacKeT(whisper_writer, online_writer, 'OnLine', leave_pkt)
-        await asyncio.sleep(1)
+        if online_writer:
+            leave_pkt = await leave_squad_packet(key, iv, region)
+            await SEndPacKeT(whisper_writer, online_writer, 'OnLine', leave_pkt)
+            await asyncio.sleep(1)
     except:
         pass
 
     while not stop_auto:
         try:
-            if chat_type is not None:
-                await dl_send_message(chat_type, f"[B][C][FFA500]🤖 Auto Start Bot\n🎯 Team: {team_code}\n⚡ Joining team...",
-                                      uid, chat_id, key, iv)
+            # Wait for online_writer to be available
+            while online_writer is None and not stop_auto:
+                await asyncio.sleep(2)
+            if stop_auto:
+                break
+
+            # Join team
             join_packet = await join_teamcode_packet(team_code, key, iv, region)
             await SEndPacKeT(whisper_writer, online_writer, 'OnLine', join_packet)
             await asyncio.sleep(2)
 
-            if chat_type is not None:
-                await dl_send_message(chat_type, f"[B][C][00FF00]✅ Joined team {team_code}\n🎯 Starting match...",
-                                      uid, chat_id, key, iv)
+            # Start match
             start_packet = await start_auto_packet(key, iv, region)
-            # Send multiple start packets to ensure the match begins
             for _ in range(5):
                 if stop_auto:
                     break
@@ -799,29 +802,30 @@ async def auto_start_loop(team_code, uid, chat_id, chat_type, key, iv, region):
             if stop_auto:
                 break
 
-            if chat_type is not None:
-                await dl_send_message(chat_type, f"[B][C][FFFF00]⏳ Match started! Bot in lobby waiting {wait_after_match} seconds...",
-                                      uid, chat_id, key, iv)
-            waited = 0
-            while waited < wait_after_match and not stop_auto:
+            # Wait in lobby (match simulation)
+            for _ in range(wait_after_match):
+                if stop_auto:
+                    break
                 await asyncio.sleep(1)
-                waited += 1
 
             if stop_auto:
                 break
 
-            if chat_type is not None:
-                await dl_send_message(chat_type, f"[B][C][FF0000]🔄 Leaving team {team_code} to rejoin and start again...",
-                                      uid, chat_id, key, iv)
+            # Leave squad
             leave_packet = await leave_squad_packet(key, iv, region)
             await SEndPacKeT(whisper_writer, online_writer, 'OnLine', leave_packet)
             await asyncio.sleep(2)
 
         except Exception as e:
+            # ❌ Pahle 'break' tha – isliye band ho jaata tha
+            # ✅ Ab 'continue' karega – error aane par wait karega aur restart karega
             if chat_type is not None:
-                error_msg = f"[B][C][FF0000]❌ Auto start error: {str(e)}\n"
+                error_msg = f"[B][C][FF0000]⚠️ Auto start cycle error: {str(e)}. Retrying in 10 seconds...\n"
                 await dl_send_message(chat_type, error_msg, uid, chat_id, key, iv)
-            break
+            print(f"❌ Cycle error: {e}, retrying...")
+            await asyncio.sleep(10)
+            continue   # <-- Yeh line IMPORTANT hai
+
     auto_start_running = False
     stop_auto = False
 
