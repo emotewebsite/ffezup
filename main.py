@@ -2761,14 +2761,19 @@ def get_random_evo_emote():
     return int(random.choice([evo_emotes[str(i)] for i in range(1, 19)]))
 
 # ==============================================================
-#                     FLASK API INTEGRATION
+#                     FLASK API INTEGRATION (FIXED)
 # ==============================================================
 
 flask_app = Flask(__name__)
-bot_event_loop = None   # Will be set from MaiiiinE()
+bot_event_loop = None
 bot_key = None
 bot_iv = None
 bot_region = None
+
+# 🔥 ROOT ROUTE ADD KIYA – Render ke health check ke liye
+@flask_app.route('/')
+def home():
+    return jsonify({"status": "alive", "message": "Bot running"}), 200
 
 @flask_app.route('/lw_start', methods=['GET'])
 def api_lw_start():
@@ -2785,8 +2790,7 @@ def api_lw_start():
     auto_start_running = True
     auto_start_teamcode = team_code
 
-    # We need to pass the correct parameters to auto_start_loop.
-    # For API, we'll use chat_type = None to suppress messages (silent mode)
+    # For API, use chat_type = None to suppress messages (silent mode)
     coro = auto_start_loop(team_code, ADMIN_UID, ADMIN_UID, None, bot_key, bot_iv, bot_region)
     future = asyncio.run_coroutine_threadsafe(coro, bot_event_loop)
     auto_start_task = future
@@ -2815,12 +2819,36 @@ def api_lw_status():
         "team_code": auto_start_teamcode if auto_start_running else None
     }), 200
 
-import os
+# ==============================================================
+#                   MAIN ENTRY POINT (FIXED)
+# ==============================================================
 
-def run_flask():
+def run_bot_in_background():
+    """Bot ko background thread mein chalane ke liye (Flask ko block nahi karega)"""
+    try:
+        asyncio.run(StarTinG())
+    except Exception as e:
+        print(f"❌ Bot background thread error: {e}")
+        import traceback
+        traceback.print_exc()
+
+if __name__ == '__main__':
+    import threading
+    import os
+    
+    # Bot ko background thread mein start karo
+    bot_thread = threading.Thread(target=run_bot_in_background, daemon=False)
+    bot_thread.start()
+    print("🤖 Bot background thread started...")
+    
+    # Flask ko MAIN THREAD mein chalao – Render ko port turant milega
     port = int(os.environ.get("PORT", 5000))
-    flask_app.run(host='0.0.0.0', port=port, debug=False, use_reloader=False)
-
+    print(f"🔥 Flask starting on 0.0.0.0:{port}")
+    try:
+        flask_app.run(host='0.0.0.0', port=port, debug=False, use_reloader=False)
+    except Exception as e:
+        print(f"❌ Flask error: {e}")
+        sys.exit(1)
 # ==============================================================
 #                   MODIFIED MAIN SECTION
 # ==============================================================
