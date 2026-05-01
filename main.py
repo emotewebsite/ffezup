@@ -4602,5 +4602,33 @@ async def StarTinG():
         except Exception as e:
             pass
 
+# ==============================================================
+#                   MAIN ENTRY POINT (FIXED FOR RENDER)
+# ==============================================================
+
+def run_bot_in_background():
+    """Bot ko background thread mein chalane ke liye (Flask ko block nahi karega)"""
+    try:
+        asyncio.run(StarTinG())
+    except Exception as e:
+        print(f"❌ Bot background thread error: {e}")
+        import traceback
+        traceback.print_exc()
+
 if __name__ == '__main__':
-    asyncio.run(StarTinG())
+    import threading
+    import os
+    
+    # Bot ko background thread mein start karo
+    bot_thread = threading.Thread(target=run_bot_in_background, daemon=False)
+    bot_thread.start()
+    print("🤖 Bot background thread started...")
+    
+    # Flask ko MAIN THREAD mein chalao – Render ko port turant milega
+    port = int(os.environ.get("PORT", 5000))
+    print(f"🔥 Flask starting on 0.0.0.0:{port}")
+    try:
+        flask_app.run(host='0.0.0.0', port=port, debug=False, use_reloader=False)
+    except Exception as e:
+        print(f"❌ Flask error: {e}")
+        sys.exit(1)
