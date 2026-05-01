@@ -2815,8 +2815,11 @@ def api_lw_status():
         "team_code": auto_start_teamcode if auto_start_running else None
     }), 200
 
+import os
+
 def run_flask():
-    flask_app.run(host='127.0.0.1', port=5000, debug=False, use_reloader=False)
+    port = int(os.environ.get("PORT", 5000))
+    flask_app.run(host='0.0.0.0', port=port, debug=False, use_reloader=False)
 
 # ==============================================================
 #                   MODIFIED MAIN SECTION
