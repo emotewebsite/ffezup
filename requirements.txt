@@ -11,3 +11,4 @@ protobuf-decoder
 pytz
 aiohttp
 cfonts
+gunicorn
